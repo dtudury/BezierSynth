@@ -6,15 +6,37 @@ class BezierToneGenerator extends AudioWorkletProcessor {
     super()
     this.positions = {}
     this.controlData = {}
-    function setControlData (data, ...path) {
-      getControl(...path).data = data
-    }
     function getControl (...path) {
       let current = path
       path.forEach(step => {
         current = current[step] = current[step] || {}
       })
       return current
+    }
+    function getControlValue (...path) {
+      const control = getControl(...path)
+      return control.value ?? control.target ?? 0
+    }
+    function setControlTarget (target, ...path) {
+      getControl(...path).target = target
+    }
+    function advanceControl (dt, ...path) {
+      const a = 0.01
+      const f = 0.95
+      const control = getControl(...path)
+      control.dv ??= 0
+      if (Math.abs(control.dv) < 0.01 && Math.abs(control.value - control.target) < 0.1) {
+        control.dv = 0
+        control.value = control.target
+        if (control.value === 0) {
+          // TODO: cleanup tree
+        }
+        return control.value
+      } else {
+        control.dv = (control.dv + (control.target - control.value) * a * dt) * f
+        control.value += control.dv * dt
+        return control.value
+      }
     }
     this.port.onmessage = e => {
       console.log(e.data)

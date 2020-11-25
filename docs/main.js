@@ -1,5 +1,5 @@
 /* eslint-env browser */
-import { h, mapEntries, render, showIfElse } from './horseless.0.6.0.min.js'
+import { h, mapEntries, render, showIfElse, watchFunction } from './horseless.0.6.0.min.js'
 import { model } from './MIDIModel.js'
 
 let audioContext = null
@@ -16,6 +16,9 @@ async function attachAudio () {
       window.pressureParameter = pressureParameter
       bezierToneGenerator.connect(audioContext.destination)
       window.bezierToneGenerator = bezierToneGenerator
+      watchFunction(() => {
+        bezierToneGenerator.port.postMessage(JSON.parse(JSON.stringify(model.inputs)))
+      })
     } catch (e) {
       return null
     }
