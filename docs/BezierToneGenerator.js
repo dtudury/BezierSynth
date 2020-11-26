@@ -28,6 +28,7 @@ class BezierToneGenerator extends AudioWorkletProcessor {
       while (i < notes.length) {
         const note = notes[i]
         note.pressure.target = 0
+        ++i
       }
     }
   }
