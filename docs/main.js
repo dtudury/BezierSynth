@@ -12,12 +12,11 @@ async function attachAudio () {
       await audioContext.resume()
       await audioContext.audioWorklet.addModule('BezierToneGenerator.js')
       const bezierToneGenerator = new AudioWorkletNode(audioContext, 'bezier-tone-generator')
-      const pressureParameter = bezierToneGenerator.parameters.get('pressure')
-      window.pressureParameter = pressureParameter
       bezierToneGenerator.connect(audioContext.destination)
+      // bezierToneGenerator.onprocessorerror(console.error)
       window.bezierToneGenerator = bezierToneGenerator
       watchFunction(() => {
-        bezierToneGenerator.port.postMessage(JSON.parse(JSON.stringify(model.inputs)))
+        bezierToneGenerator.port.postMessage(JSON.parse(JSON.stringify(model.notes)))
       })
     } catch (e) {
       return null
@@ -26,33 +25,25 @@ async function attachAudio () {
 }
 
 const inputs = mapEntries(() => model.inputs, (input, id) => {
+  const notes = model.notes[id] = model.notes[id] || []
   const open = el => e => {
     input.MIDIInput.open()
   }
   const close = el => e => {
     input.MIDIInput.close()
   }
-  const channels = mapEntries(() => input.channels, (channel, id) => {
-    const notes = el => {
-      return Object.entries(channel.notes).map(([index, note]) => {
-        return h`<div>${() => index} ${() => note}</div>`
-      })
-    }
+  const channels = mapEntries(() => notes, (note, id) => {
     const controls = el => {
-      return Object.entries(channel.controls).map(([index, control]) => {
+      return Object.entries(note.controls).map(([index, control]) => {
         return h`<div>${() => index} ${() => control}</div>`
       })
     }
     return h`
       <div style="padding: 5px; border: 1px solid black;">
-        <h3>channel ${id}</h3>
-        <span>pressure: ${() => channel.pressure}</span>
+        <h3>note ${note.index}</h3>
+        <span>pressure: ${() => note.pressure}</span>
         <br>
-        <span>bend: ${() => channel.bend}</span>
-        <div style="padding: 5px; border: 1px solid black;">
-          <h4>notes</h4>
-          ${notes}
-        </div>
+        <span>bend: ${() => note.bend}</span>
         <div style="padding: 5px; border: 1px solid black;">
           <h4>controls</h4>
           ${controls}
@@ -71,10 +62,10 @@ const inputs = mapEntries(() => model.inputs, (input, id) => {
       <br>
       ${showIfElse(() => input.connection === 'open', h`
         <button onclick=${close}>close</button>
-        ${channels}
       `, h`
         <button onclick=${open}>open</button>
       `)}
+      ${channels}
     </div>
   `
 })
