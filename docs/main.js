@@ -13,7 +13,7 @@ async function attachAudio () {
       await audioContext.audioWorklet.addModule('BezierToneGenerator.js')
       const bezierToneGenerator = new AudioWorkletNode(audioContext, 'bezier-tone-generator')
       bezierToneGenerator.connect(audioContext.destination)
-      // bezierToneGenerator.onprocessorerror(console.error)
+      bezierToneGenerator.onprocessorerror = console.error
       window.bezierToneGenerator = bezierToneGenerator
       watchFunction(() => {
         bezierToneGenerator.port.postMessage(JSON.parse(JSON.stringify(model.notes)))

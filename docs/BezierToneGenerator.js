@@ -18,6 +18,7 @@ class BezierToneGenerator extends AudioWorkletProcessor {
         const inNote = inNotes[i]
         note.index.target = inNote.index
         note.pressure.target = inNote.pressure
+        note.pressure.value ||= 0
         note.bend.target = inNote.bend
         for (const number in inNote.controls) {
           const control = note.controls[number] ||= {}
@@ -37,7 +38,7 @@ class BezierToneGenerator extends AudioWorkletProcessor {
     function calculateValue (obj) {
       const a = 1000
       const dampness = 0.999
-      obj.value ||= obj.target
+      obj.value ??= obj.target
       obj.dv ??= 0
       obj.dv = (obj.dv + (obj.target - obj.value) * a * dt) * dampness
       obj.value += obj.dv * dt
@@ -65,6 +66,30 @@ class BezierToneGenerator extends AudioWorkletProcessor {
     }
   }
 
+  play (note) {
+    const frequency = 440 * Math.pow(2, (note.index.value - 69) / 12)
+    note.position = (note.position + frequency / sampleRate) % 1
+
+    const x = Math.max(0, Math.min(1, note.bend.value / 8000))
+    const ix = 1 - x
+    const controls = [
+      1,
+      x * 0.3 + ix * 0.5,
+      x * -0.3 + ix * 1,
+      x * -1 + ix * 0.5,
+      x * -0.3 + ix * 1,
+      x * 0.3 + ix * -1,
+      1
+    ]
+    const step = note.position * (controls.length - 1)
+    const a = controls[Math.floor(step)]
+    const b = controls[Math.floor(step) + 1]
+    const y = 1 - Math.cos((step % 1) * 2 * Math.PI) * 0.5 + 0.5
+    return (b * y + a * (1 - y)) * note.pressure.value / 127
+
+    // return (Math.sin(note.position * 2 * Math.PI) * 2 - 1) * note.pressure.value / 127
+  }
+
   process (input, outputs, parameters) {
     const output = outputs[0]
     for (let channelIndex = 0; channelIndex < output.length; ++channelIndex) {
@@ -75,12 +100,10 @@ class BezierToneGenerator extends AudioWorkletProcessor {
         for (const id in this.notesByInput) {
           const notes = this.notesByInput[id] ||= []
           notes.forEach(note => {
-            const frequency = 440 * Math.pow(2, (note.index.value - 69) / 12)
-            note.position = (note.position + frequency / sampleRate) % 1
-            sum += 0.5 * (Math.cos(note.position * 2 * Math.PI) * 2 - 1) * note.pressure.value / 128
+            sum += this.play(note)
           })
         }
-        buffer[i] = Math.min(1, Math.max(-1, sum))
+        buffer[i] = sum
       }
     }
     return true
