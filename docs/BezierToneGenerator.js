@@ -13,8 +13,8 @@ class BezierToneGenerator extends AudioWorkletProcessor {
     switch (name) {
       case 'notes':
         return this.handleNotes(value)
-      case 'controls':
-        return this.handleControls(value)
+      case 'waveforms':
+        return this.handleWaveforms(value)
     }
   }
 
@@ -44,8 +44,9 @@ class BezierToneGenerator extends AudioWorkletProcessor {
     }
   }
 
-  handleControls (controls) {
-    console.log(controls)
+  handleWaveforms (waveforms) {
+    console.log(JSON.stringify(waveforms, null, ' . '))
+    this.waveforms = waveforms
   }
 
   calculateNotes (dt) {
@@ -83,6 +84,7 @@ class BezierToneGenerator extends AudioWorkletProcessor {
   play (note) {
     const frequency = 440 * Math.pow(2, (note.index.value - 69) / 12)
     note.position = (note.position + frequency / sampleRate) % 1
+    /*
     const i = Math.max(0, Math.min(1, note.bend.value / 8000))
 
     function calculatePoint (controls, position) {
@@ -101,8 +103,24 @@ class BezierToneGenerator extends AudioWorkletProcessor {
     const ap = calculatePoint(a, note.position)
     const bp = calculatePoint(b, note.position)
     return (ap * i + bp * (1 - i)) * note.pressure.value / 127
+    */
 
-    // return (Math.sin(note.position * 2 * Math.PI) * 2 - 1) * note.pressure.value / 127
+    if (this.waveforms && this.waveforms[0]) {
+      const waveform = this.waveforms[0]
+      const waveformPosition = note.position * waveform.length
+      const step = Math.ceil(waveformPosition)
+      const p = waveformPosition % 1
+      const i = 1 - p
+      const left = waveform[(step + waveform.length - 1) % waveform.length]
+      const right = waveform[(step + 1) % waveform.length]
+      const a = left[2].y
+      const b = right[0].y
+      const c = right[1].y
+      const d = right[2].y
+      return 0.2 * (a * i * i * i + 3 * b * i * i * p + 3 * c * i * p * p + d * p * p * p) * note.pressure.value / 127
+    } else {
+      return (Math.sin(note.position * 2 * Math.PI) * 2 - 1) * note.pressure.value / 127
+    }
   }
 
   process (input, outputs, parameters) {
@@ -119,6 +137,9 @@ class BezierToneGenerator extends AudioWorkletProcessor {
           })
         }
         buffer[i] = sum
+        if (Math.random() * 10000 < 1) {
+          console.log(buffer[i])
+        }
       }
     }
     return true

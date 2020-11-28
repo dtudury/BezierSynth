@@ -127,7 +127,9 @@ navigator.requestMIDIAccess().then(midiAccess => {
     Array.from(midiAccess.inputs.entries()).forEach(([id, MIDIInput]) => {
       const controls = {}
       const input = model.inputs[id] = model.inputs[id] || {}
-      const notes = model.notes[id] = model.notes[id] || [{ controls }] // some proxy magic clones controls
+      // const notes = model.notes[id] = model.notes[id] || [{ controls }] // some proxy magic clones controls
+      const notes = []
+      model.notes[id] = [{ index: 69, pressure: 40, controls }]
       function updateInput () {
         if (!MIDIInput) return
         input.name = MIDIInput.name
