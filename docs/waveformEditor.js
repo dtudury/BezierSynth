@@ -3,10 +3,10 @@ import { model } from './MIDIModel.js'
 
 model.waveforms ??= [
   [
-    { x: 0 / 12, y: 1, slope: 0 },
-    { x: 3 / 12, y: -1, slope: 0 },
-    { x: 6 / 12, y: 1, slope: 0 },
-    { x: 9 / 12, y: -1, slope: 0 }
+    { x: 0 / 12, y: 1, slope: 1 },
+    { x: 3 / 12, y: -1, slope: -1 },
+    { x: 6 / 12, y: 1, slope: 1 },
+    { x: 9 / 12, y: -1, slope: -1 }
   ]
 ]
 
@@ -65,7 +65,7 @@ export const waveformEditor = h`
     <path d="${pathData}" stroke-width="10" stroke="#ffffff" fill="none"/>
     <path d="${pathData}" stroke="#000000" fill="none"/>
     <path d="${debugPathData}" stroke="#ff0000" fill="none"/>
-    ${mapEntries(() => model.waveforms[0], (control, index) => {
+    ${mapEntries(() => model.waveforms, waveform => mapEntries(() => waveform, (control, index) => {
       /*
       const handleMouseDown = el => downEvent => {
         const begin = { x: control.x, y: control.y }
@@ -90,10 +90,29 @@ export const waveformEditor = h`
         }
       }
       */
+      const leftIndex = (+index - 1 + waveform.length) % waveform.length
+      const left = JSON.parse(JSON.stringify(waveform[leftIndex]))
+      const rightIndex = (+index + 1) % waveform.length
+      const right = JSON.parse(JSON.stringify(waveform[rightIndex]))
+      console.log(leftIndex, index, rightIndex, waveform.length)
+      if (!rightIndex) right.x = 1
+      const leftThird = (control.x - left.x) / 3
+      const rightThird = (right.x - control.x) / 3
+      const leftControl = { x: control.x - leftThird, y: control.y - leftThird * control.slope }
+      const rightControl = { x: control.x + rightThird, y: control.y + rightThird * control.slope }
       return h`
-        <circle r="5" cx="${() => mapX(control.x)}" cy="${() => mapY(control.y)}">
+        <line 
+          x1="${() => mapX(leftControl.x)}" 
+          y1="${() => mapY(leftControl.y)}" 
+          x2="${() => mapX(rightControl.x)}" 
+          y2="${() => mapY(rightControl.y)}"
+          stroke="#000000"
+        />
+        <circle r="5" cx="${() => mapX(leftControl.x)}" cy="${() => mapY(leftControl.y)}" fill="red"/>
+        <circle r="5" cx="${() => mapX(rightControl.x)}" cy="${() => mapY(rightControl.y)}" fill="blue"/>
+        <circle r="5" cx="${() => mapX(control.x)}" cy="${() => mapY(control.y)}"/>
       `
-    })}
+    }))}
   </svg>
 `
 // <path d="${() => getPathData(model)}"/>
