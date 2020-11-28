@@ -9,9 +9,19 @@ class BezierToneGenerator extends AudioWorkletProcessor {
   }
 
   handleMessage (e) {
-    for (const id in e.data) {
+    const { name, value } = e.data
+    switch (name) {
+      case 'notes':
+        return this.handleNotes(value)
+      case 'controls':
+        return this.handleControls(value)
+    }
+  }
+
+  handleNotes (notesByInput) {
+    for (const id in notesByInput) {
       const notes = this.notesByInput[id] ||= []
-      const inNotes = e.data[id]
+      const inNotes = notesByInput[id]
       let i = 0
       while (i < inNotes.length) {
         const note = notes[i] ||= { index: {}, pressure: {}, bend: {}, controls: {}, position: 0 }
@@ -32,6 +42,10 @@ class BezierToneGenerator extends AudioWorkletProcessor {
         ++i
       }
     }
+  }
+
+  handleControls (controls) {
+    console.log(controls)
   }
 
   calculateNotes (dt) {
@@ -69,23 +83,24 @@ class BezierToneGenerator extends AudioWorkletProcessor {
   play (note) {
     const frequency = 440 * Math.pow(2, (note.index.value - 69) / 12)
     note.position = (note.position + frequency / sampleRate) % 1
+    const i = Math.max(0, Math.min(1, note.bend.value / 8000))
 
-    const x = Math.max(0, Math.min(1, note.bend.value / 8000))
-    const ix = 1 - x
-    const controls = [
-      1,
-      x * 0.3 + ix * 0.5,
-      x * -0.3 + ix * 1,
-      x * -1 + ix * 0.5,
-      x * -0.3 + ix * 1,
-      x * 0.3 + ix * -1,
-      1
+    function calculatePoint (controls, position) {
+      const step = position * (controls.length - 1)
+      const p0 = controls[Math.floor(step)]
+      const p1 = controls[Math.floor(step) + 1]
+      const i = Math.cos((step % 1) * 2 * Math.PI) * 0.5 + 0.5
+      return p1 * i + p0 * (1 - i)
+    }
+    const a = [
+      1, 0.5, 0.75, 0, -1, -0.75, -1, -0.6, -0.8, -1, 0.75, 0.5, 1
     ]
-    const step = note.position * (controls.length - 1)
-    const a = controls[Math.floor(step)]
-    const b = controls[Math.floor(step) + 1]
-    const y = 1 - Math.cos((step % 1) * 2 * Math.PI) * 0.5 + 0.5
-    return (b * y + a * (1 - y)) * note.pressure.value / 127
+    const b = [
+      1, -1, 1
+    ]
+    const ap = calculatePoint(a, note.position)
+    const bp = calculatePoint(b, note.position)
+    return (ap * i + bp * (1 - i)) * note.pressure.value / 127
 
     // return (Math.sin(note.position * 2 * Math.PI) * 2 - 1) * note.pressure.value / 127
   }
