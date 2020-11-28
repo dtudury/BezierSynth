@@ -108,11 +108,11 @@ class BezierToneGenerator extends AudioWorkletProcessor {
     if (this.waveforms && this.waveforms[0]) {
       const waveform = this.waveforms[0]
       const waveformPosition = note.position * waveform.length
-      const step = Math.ceil(waveformPosition)
+      const step = Math.floor(waveformPosition)
       const p = waveformPosition % 1
       const i = 1 - p
       const left = waveform[(step + waveform.length - 1) % waveform.length]
-      const right = waveform[(step + 1) % waveform.length]
+      const right = waveform[(step + waveform.length) % waveform.length]
       const a = left[2].y
       const b = right[0].y
       const c = right[1].y
