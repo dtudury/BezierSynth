@@ -3,33 +3,12 @@ import { model } from './MIDIModel.js'
 
 model.waveforms ??= [
   [
-    [
-      { x: 1 / 12, y: 1 },
-      { x: 2 / 12, y: -1 },
-      { x: 3 / 12, y: -1 }
-    ],
-    [
-      { x: 4 / 12, y: 1 },
-      { x: 5 / 12, y: -1 },
-      { x: 6 / 12, y: -1 }
-    ],
-    [
-      { x: 7 / 12, y: 1 },
-      { x: 8 / 12, y: -1 },
-      { x: 9 / 12, y: -1 }
-    ],
-    [
-      { x: 10 / 12, y: -1 },
-      { x: 11 / 12, y: 1 },
-      { x: 12 / 12, y: 1 }
-    ]
+    { x: 0 / 12, y: 1, slope: 0 },
+    { x: 3 / 12, y: -1, slope: 0 },
+    { x: 6 / 12, y: 1, slope: 0 },
+    { x: 9 / 12, y: -1, slope: 0 }
   ]
 ]
-/*
-watchFunction(() => {
-  bezierToneGenerator.port.postMessage({ name: 'notes', value: JSON.parse(JSON.stringify(model.notes)) })
-})
-*/
 
 const mapX = x => x * 600
 const unmapX = x => x / 600
@@ -41,12 +20,22 @@ const curveTo = c => `C${map(c[0])},${map(c[1])},${map(c[2])}`
 
 const pathData = el => {
   const waveform = model.waveforms[0]
-  const p0 = { x: 0, y: waveform[waveform.length - 1][2].y }
-  return `${moveTo(p0)}${waveform.map(curveTo)}`
+  return `${moveTo(waveform[0])}${waveform.map((left, index) => {
+    const rightIndex = (index + 1) % waveform.length
+    const right = JSON.parse(JSON.stringify(waveform[rightIndex]))
+    if (!rightIndex) right.x = 1
+    const third = (right.x - left.x) / 3
+    return curveTo([
+      { x: left.x + third, y: left.y + third * left.slope },
+      { x: right.x - third, y: right.y - third * right.slope },
+      { x: right.x, y: right.y }
+    ])
+  })}`
 }
 
 const debugPathData = el => {
-  let out = ''
+  const out = ''
+  /*
   let prefix = 'M'
   const waveform = model.waveforms[0]
   for (let position = 0; position <= 100; ++position) {
@@ -65,7 +54,7 @@ const debugPathData = el => {
     out += prefix + mapX(position / 100) + ' ' + mapY(v)
     prefix = 'L'
   }
-
+  */
   return out
 }
 
@@ -76,7 +65,8 @@ export const waveformEditor = h`
     <path d="${pathData}" stroke-width="10" stroke="#ffffff" fill="none"/>
     <path d="${pathData}" stroke="#000000" fill="none"/>
     <path d="${debugPathData}" stroke="#ff0000" fill="none"/>
-    ${mapEntries(() => model.waveforms[0].flat(), control => {
+    ${mapEntries(() => model.waveforms[0], (control, index) => {
+      /*
       const handleMouseDown = el => downEvent => {
         const begin = { x: control.x, y: control.y }
         console.log(downEvent)
@@ -99,7 +89,10 @@ export const waveformEditor = h`
           document.onmouseup = null
         }
       }
-      return h`<circle onmousedown=${handleMouseDown} r="5" cx="${() => mapX(control.x)}" cy="${() => mapY(control.y)}">`
+      */
+      return h`
+        <circle r="5" cx="${() => mapX(control.x)}" cy="${() => mapY(control.y)}">
+      `
     })}
   </svg>
 `
