@@ -3,10 +3,10 @@ import { model } from './MIDIModel.js'
 
 model.waveforms ??= [
   [
-    { x: 0 / 12, y: 1, slope: 1 },
-    { x: 3 / 12, y: -1, slope: -1 },
-    { x: 6 / 12, y: 1, slope: 1 },
-    { x: 9 / 12, y: -1, slope: -1 }
+    { x: 0 / 12, y: 1, slope: 10 },
+    { x: 3 / 12, y: -1, slope: -10 },
+    { x: 6 / 12, y: 1, slope: 10 },
+    { x: 9 / 12, y: -1, slope: -10 }
   ]
 ]
 
@@ -33,56 +33,42 @@ const pathData = el => {
   })}`
 }
 
-const debugPathData = el => {
-  const out = ''
-  /*
-  let prefix = 'M'
-  const waveform = model.waveforms[0].sort((a, b) => a.x - b.x)
-  for (let position = 0; position <= 100; ++position) {
-    const x = position / 100
-    let index = waveform.length - 1
-    while (waveform[index].x > x && index) index--
-    const left = waveform[index]
-    const right = waveform[(index + 1) % waveform.length]
-    const dx = ((index === waveform.length - 1) ? 1 : right.x) - left.x
-    const third = dx / 3
-    const a = left.y
-    const b = left.y + left.slope * third
-    const c = right.y - right.slope * third
-    const d = right.y
-    const p = (x - left.x) / dx
-    const i = 1 - p
-    const v = a * i * i * i + 3 * b * i * i * p + 3 * c * i * p * p + d * p * p * p
-    out += prefix + mapX(x) + ' ' + mapY(v)
-    prefix = 'L'
-  }
-  */
-  return out
+const addPoint = el => e => {
+  if (!e.shiftKey) return
+  // TODO: fun here
+  console.log(e)
 }
 
 export const waveformEditor = h`
   <h1>Waveform Editor</h1>
   <svg width="600px" height="300px" viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" style="border: 1px solid black; padding: 5px; box-sizing: border-box;">
-    <rect x="0" y="100" width="600" height="100" fill="#eeeeee" />
-    <path d="${pathData}" stroke-width="10" stroke="#ffffff" fill="none"/>
-    <path d="${pathData}" stroke="#000000" fill="none"/>
-    <path d="${debugPathData}" stroke="#ff0000" fill="none"/>
+    <rect id="area" x="0" y="100" width="600" height="100" fill="#eeeeee" />
+    <path onclick=${addPoint} d="${pathData}" stroke-width="10" stroke="#ffffff" fill="none"/>
+    <path style="pointer-events: none;" d="${pathData}" stroke="#000000" fill="none"/>
     ${mapEntries(() => model.waveforms, waveform => mapEntries(() => waveform.sort((a, b) => a.x - b.x), control => {
       const startDrag = f => el => downEvent => {
+        if (downEvent.shiftKey) {
+          waveform.splice(waveform.indexOf(control), 1)
+          return
+        }
         const begin = { x: control.x, y: control.y }
-        console.log(downEvent)
         document.onmouseleave = e => {
-          console.log('on mouse leave')
           document.onmouseleave = null
           document.onmousemove = null
           document.onmouseup = null
           f(begin.x, begin.y)
         }
         document.onmousemove = e => {
-          f(begin.x + unmapX(e.screenX) - unmapX(downEvent.screenX), begin.y + unmapY(e.screenY) - unmapY(downEvent.screenY))
+          const svg = document.querySelector('svg')
+          const point = svg.createSVGPoint()
+          point.x = e.clientX
+          point.y = e.clientY
+          const ctm = svg.getScreenCTM()
+          const inverse = ctm.inverse()
+          const p = point.matrixTransform(inverse)
+          f(unmapX(p.x), unmapY(p.y))
         }
         document.onmouseup = e => {
-          console.log('on mouse up')
           document.onmouseleave = null
           document.onmousemove = null
           document.onmouseup = null
@@ -107,10 +93,10 @@ export const waveformEditor = h`
         control.y = y
       })
       const startDragLeft = startDrag((x, y) => {
-        control.slope = (y - control.y) / (x - control.x - getLeftThird())
+        control.slope = (y - control.y) / (x - getControlXForLeft())
       })
       const startDragRight = startDrag((x, y) => {
-        control.slope = (y - control.y) / (x - control.x + getRightThird())
+        control.slope = (y - control.y) / (x - control.x)
       })
       return h`
         <line 

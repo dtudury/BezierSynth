@@ -5,6 +5,7 @@ export const model = window.model = proxy({
   inputs: {},
   notes: {}
 })
+model.notes[0] = [{ index: 69 - 24, pressure: 40, controls: {} }]
 
 // channel voice messages
 const CHANNEL_VOICE_MESSAGE = 'Channel Voice Message'

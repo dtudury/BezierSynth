@@ -45,7 +45,6 @@ class BezierToneGenerator extends AudioWorkletProcessor {
   }
 
   handleWaveforms (waveforms) {
-    console.log(JSON.stringify(waveforms, null, ' . '))
     this.waveforms = waveforms
   }
 
@@ -84,40 +83,24 @@ class BezierToneGenerator extends AudioWorkletProcessor {
   play (note) {
     const frequency = 440 * Math.pow(2, (note.index.value - 69) / 12)
     note.position = (note.position + frequency / sampleRate) % 1
-    /*
-    const i = Math.max(0, Math.min(1, note.bend.value / 8000))
-
-    function calculatePoint (controls, position) {
-      const step = position * (controls.length - 1)
-      const p0 = controls[Math.floor(step)]
-      const p1 = controls[Math.floor(step) + 1]
-      const i = Math.cos((step % 1) * 2 * Math.PI) * 0.5 + 0.5
-      return p1 * i + p0 * (1 - i)
-    }
-    const a = [
-      1, 0.5, 0.75, 0, -1, -0.75, -1, -0.6, -0.8, -1, 0.75, 0.5, 1
-    ]
-    const b = [
-      1, -1, 1
-    ]
-    const ap = calculatePoint(a, note.position)
-    const bp = calculatePoint(b, note.position)
-    return (ap * i + bp * (1 - i)) * note.pressure.value / 127
-    */
 
     if (this.waveforms && this.waveforms[0]) {
       const waveform = this.waveforms[0]
-      const waveformPosition = note.position * waveform.length
-      const step = Math.floor(waveformPosition)
-      const p = waveformPosition % 1
+      const x = note.position
+      let index = waveform.length - 1
+      while (waveform[index].x > x && index) index--
+      const left = waveform[index]
+      const right = waveform[(index + 1) % waveform.length]
+      const dx = ((index === waveform.length - 1) ? 1 : right.x) - left.x
+      const third = dx / 3
+      const a = left.y
+      const b = left.y + left.slope * third
+      const c = right.y - right.slope * third
+      const d = right.y
+      const p = (x - left.x) / dx
       const i = 1 - p
-      const left = waveform[(step + waveform.length - 1) % waveform.length]
-      const right = waveform[(step + waveform.length) % waveform.length]
-      const a = left[2].y
-      const b = right[0].y
-      const c = right[1].y
-      const d = right[2].y
-      return 0.2 * (a * i * i * i + 3 * b * i * i * p + 3 * c * i * p * p + d * p * p * p) * note.pressure.value / 127
+      const v = a * i * i * i + 3 * b * i * i * p + 3 * c * i * p * p + d * p * p * p
+      return 0.2 * v * note.pressure.value / 127
     } else {
       return (Math.sin(note.position * 2 * Math.PI) * 2 - 1) * note.pressure.value / 127
     }
@@ -137,9 +120,6 @@ class BezierToneGenerator extends AudioWorkletProcessor {
           })
         }
         buffer[i] = sum
-        if (Math.random() * 10000 < 1) {
-          console.log(buffer[i])
-        }
       }
     }
     return true
