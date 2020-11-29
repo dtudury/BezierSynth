@@ -1,4 +1,4 @@
-import { h, mapEntries } from './horseless.0.6.0.min.js'
+import { h, mapEntries, showIfElse } from './horseless.0.6.0.min.js'
 import { model } from './MIDIModel.js'
 
 model.waveforms ??= [
@@ -37,21 +37,23 @@ const debugPathData = el => {
   const out = ''
   /*
   let prefix = 'M'
-  const waveform = model.waveforms[0]
+  const waveform = model.waveforms[0].sort((a, b) => a.x - b.x)
   for (let position = 0; position <= 100; ++position) {
-    const waveformPosition = (position / 100) * waveform.length
-    const step = Math.floor(waveformPosition)
-    const p = waveformPosition % 1
+    const x = position / 100
+    let index = waveform.length - 1
+    while (waveform[index].x > x && index) index--
+    const left = waveform[index]
+    const right = waveform[(index + 1) % waveform.length]
+    const dx = ((index === waveform.length - 1) ? 1 : right.x) - left.x
+    const third = dx / 3
+    const a = left.y
+    const b = left.y + left.slope * third
+    const c = right.y - right.slope * third
+    const d = right.y
+    const p = (x - left.x) / dx
     const i = 1 - p
-    const left = waveform[(step + waveform.length - 1) % waveform.length]
-    const right = waveform[(step + waveform.length + 0) % waveform.length]
-    const a = left[2].y
-    const b = right[0].y
-    const c = right[1].y
-    const d = right[2].y
     const v = a * i * i * i + 3 * b * i * i * p + 3 * c * i * p * p + d * p * p * p
-    // const v = a * p + d * i
-    out += prefix + mapX(position / 100) + ' ' + mapY(v)
+    out += prefix + mapX(x) + ' ' + mapY(v)
     prefix = 'L'
   }
   */
@@ -65,9 +67,8 @@ export const waveformEditor = h`
     <path d="${pathData}" stroke-width="10" stroke="#ffffff" fill="none"/>
     <path d="${pathData}" stroke="#000000" fill="none"/>
     <path d="${debugPathData}" stroke="#ff0000" fill="none"/>
-    ${mapEntries(() => model.waveforms, waveform => mapEntries(() => waveform, (control, index) => {
-      /*
-      const handleMouseDown = el => downEvent => {
+    ${mapEntries(() => model.waveforms, waveform => mapEntries(() => waveform.sort((a, b) => a.x - b.x), control => {
+      const startDrag = f => el => downEvent => {
         const begin = { x: control.x, y: control.y }
         console.log(downEvent)
         document.onmouseleave = e => {
@@ -75,12 +76,10 @@ export const waveformEditor = h`
           document.onmouseleave = null
           document.onmousemove = null
           document.onmouseup = null
-          // control.x = begin.x
-          control.y = begin.y
+          f(begin.x, begin.y)
         }
         document.onmousemove = e => {
-          // control.x = begin.x + unmapX(e.screenX) - unmapX(downEvent.screenX)
-          control.y = begin.y + unmapY(e.screenY) - unmapY(downEvent.screenY)
+          f(begin.x + unmapX(e.screenX) - unmapX(downEvent.screenX), begin.y + unmapY(e.screenY) - unmapY(downEvent.screenY))
         }
         document.onmouseup = e => {
           console.log('on mouse up')
@@ -89,30 +88,61 @@ export const waveformEditor = h`
           document.onmouseup = null
         }
       }
-      */
-      const leftIndex = (+index - 1 + waveform.length) % waveform.length
-      const left = JSON.parse(JSON.stringify(waveform[leftIndex]))
-      const rightIndex = (+index + 1) % waveform.length
-      const right = JSON.parse(JSON.stringify(waveform[rightIndex]))
-      console.log(leftIndex, index, rightIndex, waveform.length)
-      if (!rightIndex) right.x = 1
-      const leftThird = (control.x - left.x) / 3
-      const rightThird = (right.x - control.x) / 3
-      const leftControl = { x: control.x - leftThird, y: control.y - leftThird * control.slope }
-      const rightControl = { x: control.x + rightThird, y: control.y + rightThird * control.slope }
+      const getControlXForLeft = () => waveform.indexOf(control) ? control.x : 1
+      const getRight = () => waveform[(waveform.indexOf(control) + 1) % waveform.length]
+      const getRightThird = () => (((waveform.indexOf(control) === waveform.length - 1) ? 1 : getRight().x) - control.x) / 3
+      const getRightControlX = () => mapX(control.x + getRightThird())
+      const getRightControlY = () => mapY(control.y + getRightThird() * control.slope)
+      const getLeft = () => waveform[(waveform.indexOf(control) + waveform.length - 1) % waveform.length]
+      const getLeftThird = () => (getControlXForLeft() - getLeft().x) / 3
+      const getLeftControlX = () => mapX(getControlXForLeft() - getLeftThird())
+      const getLeftControlY = () => mapY(control.y - getLeftThird() * control.slope)
+
+      const startDragControl = startDrag((x, y) => {
+        if (waveform.indexOf(control)) {
+          control.x = x
+        } else {
+          control.x = 0
+        }
+        control.y = y
+      })
+      const startDragLeft = startDrag((x, y) => {
+        control.slope = (y - control.y) / (x - control.x - getLeftThird())
+      })
+      const startDragRight = startDrag((x, y) => {
+        control.slope = (y - control.y) / (x - control.x + getRightThird())
+      })
       return h`
         <line 
-          x1="${() => mapX(leftControl.x)}" 
-          y1="${() => mapY(leftControl.y)}" 
-          x2="${() => mapX(rightControl.x)}" 
-          y2="${() => mapY(rightControl.y)}"
-          stroke="#000000"
+          x1="${() => mapX(control.x)}" 
+          y1="${() => mapY(control.y)}" 
+          x2="${getRightControlX}" 
+          y2="${getRightControlY}"
+          stroke="blue"
         />
-        <circle r="5" cx="${() => mapX(leftControl.x)}" cy="${() => mapY(leftControl.y)}" fill="red"/>
-        <circle r="5" cx="${() => mapX(rightControl.x)}" cy="${() => mapY(rightControl.y)}" fill="blue"/>
-        <circle r="5" cx="${() => mapX(control.x)}" cy="${() => mapY(control.y)}"/>
+        ${showIfElse(() => waveform.indexOf(control), h`
+          <line 
+            x1="${getLeftControlX}" 
+            y1="${getLeftControlY}" 
+            x2="${() => mapX(control.x)}" 
+            y2="${() => mapY(control.y)}"
+            stroke="red"
+          />
+          <circle r="5" onmousedown=${startDragLeft} cx="${getLeftControlX}" cy="${getLeftControlY}" fill="red"/>
+        `, h`
+          <line 
+            x1="${getLeftControlX}" 
+            y1="${getLeftControlY}" 
+            x2="${() => mapX(1)}" 
+            y2="${() => mapY(control.y)}"
+            stroke="red"
+          />
+          <circle r="5" onmousedown=${startDragLeft} cx="${getLeftControlX}" cy="${getLeftControlY}" fill="red"/>
+          <circle r="5" onmousedown=${startDragControl} cx="${() => mapX(1)}" cy="${() => mapY(control.y)}"/>
+        `)}
+        <circle r="5" onmousedown=${startDragRight} cx="${getRightControlX}" cy="${getRightControlY}" fill="blue"/>
+        <circle r="5" onmousedown=${startDragControl} cx="${() => mapX(control.x)}" cy="${() => mapY(control.y)}"/>
       `
     }))}
   </svg>
 `
-// <path d="${() => getPathData(model)}"/>
