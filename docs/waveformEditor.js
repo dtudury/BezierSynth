@@ -10,41 +10,77 @@ model.waveforms ??= [
   ]
 ]
 
+function getSVGPoint (x, y) {
+  const point = document.querySelector('svg').createSVGPoint()
+  point.x = x
+  point.y = y
+  return point
+}
+
+function getCoordsCTM () {
+  return document.querySelector('#coords').getScreenCTM()
+}
+
+const transformX = x => getSVGPoint(x, 0).matrixTransform(getCoordsCTM().inverse()).x
+const transformY = y => getSVGPoint(0, y).matrixTransform(getCoordsCTM().inverse()).y
+const transform = (x, y) => getSVGPoint(x, y).matrixTransform(getCoordsCTM().inverse())
+
 const mapX = x => x * 600
-const unmapX = x => x / 600
 const mapY = y => y * 50 + 150
-const unmapY = y => (y - 150) / 50
-const map = p => `${mapX(p.x)} ${mapY(p.y)}`
-const moveTo = p => `M${map(p)}`
-const curveTo = c => `C${map(c[0])},${map(c[1])},${map(c[2])}`
 
 const pathData = el => {
   const waveform = model.waveforms[0]
-  return `${moveTo(waveform[0])}${waveform.map((left, index) => {
+  // return `${moveTo(waveform[0])}${waveform.map((left, index) => {
+  return `M${waveform[0].x} ${waveform[0].y}${waveform.map((left, index) => {
     const rightIndex = (index + 1) % waveform.length
     const right = JSON.parse(JSON.stringify(waveform[rightIndex]))
     if (!rightIndex) right.x = 1
     const third = (right.x - left.x) / 3
-    return curveTo([
-      { x: left.x + third, y: left.y + third * left.slope },
-      { x: right.x - third, y: right.y - third * right.slope },
-      { x: right.x, y: right.y }
-    ])
+    return `C${left.x + third} ${left.y + third * left.slope},${right.x - third} ${right.y - third * right.slope},${right.x} ${right.y}`
   })}`
 }
 
 const addPoint = el => e => {
   if (!e.shiftKey) return
-  // TODO: fun here
-  console.log(e)
+  const { x, y } = transform(e.clientX, e.clientY)
+  const waveform = model.waveforms[0]
+  let index = waveform.length - 1
+  while (waveform[index].x > x && index) index--
+  const left = waveform[index]
+  const actualRight = waveform[(index + 1) % waveform.length]
+  const right = { x: actualRight.x || 1, y: actualRight.y, slope: actualRight.slope }
+  const dx = ((index === waveform.length - 1) ? 1 : right.x) - left.x
+  const third = dx / 3
+  const p = (x - left.x) / dx
+  function subdivide (points) {
+    console.log(points)
+    if (points.length === 1) return points
+    const step = []
+    for (let i = 1; i < points.length; ++i) {
+      const left = points[i - 1]
+      const right = points[i]
+      step.push({ x: left.x * (1 - p) + right.x * p, y: left.y * (1 - p) + right.y * p })
+    }
+    return [points[0], ...subdivide(step), points[points.length - 1]]
+  }
+  const [,, c, d] = subdivide([
+    left,
+    { x: left.x + third, y: left.y + third * left.slope },
+    { x: right.x - third, y: right.y - third * right.slope },
+    right
+  ])
+  waveform.splice(index, 0, { x: d.x, y: d.y, slope: (d.y - c.y) / (d.x - c.x) })
+  console.log(x, y)
 }
 
 export const waveformEditor = h`
   <h1>Waveform Editor</h1>
-  <svg width="600px" height="300px" viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" style="border: 1px solid black; padding: 5px; box-sizing: border-box;">
-    <rect id="area" x="0" y="100" width="600" height="100" fill="#eeeeee" />
-    <path onclick=${addPoint} d="${pathData}" stroke-width="10" stroke="#ffffff" fill="none"/>
-    <path style="pointer-events: none;" d="${pathData}" stroke="#000000" fill="none"/>
+  <svg width="100%" height="400px" viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" style="border: 1px solid black; padding: 5px; box-sizing: border-box;">
+    <g transform="scale(600 50) translate(0 3)">
+      <rect id="coords" x="0" y="-1" width="1" height="2" fill="#eeeeee"/>
+      <path onclick=${addPoint} d="${pathData}" stroke-width="10" vector-effect="non-scaling-stroke" stroke="#ffffff" fill="none"/>
+      <path style="pointer-events: none;" d="${pathData}" stroke="#000000" stroke-width="0.01" fill="none"/>
+    </g>
     ${mapEntries(() => model.waveforms, waveform => mapEntries(() => waveform.sort((a, b) => a.x - b.x), control => {
       const startDrag = f => el => downEvent => {
         if (downEvent.shiftKey) {
@@ -59,14 +95,7 @@ export const waveformEditor = h`
           f(begin.x, begin.y)
         }
         document.onmousemove = e => {
-          const svg = document.querySelector('svg')
-          const point = svg.createSVGPoint()
-          point.x = e.clientX
-          point.y = e.clientY
-          const ctm = svg.getScreenCTM()
-          const inverse = ctm.inverse()
-          const p = point.matrixTransform(inverse)
-          f(unmapX(p.x), unmapY(p.y))
+          f(transformX(e.clientX), transformY(e.clientY))
         }
         document.onmouseup = e => {
           document.onmouseleave = null
@@ -74,6 +103,8 @@ export const waveformEditor = h`
           document.onmouseup = null
         }
       }
+      const getControlX = () => mapX(control.x)
+      const getControlY = () => mapY(control.y)
       const getControlXForLeft = () => waveform.indexOf(control) ? control.x : 1
       const getRight = () => waveform[(waveform.indexOf(control) + 1) % waveform.length]
       const getRightThird = () => (((waveform.indexOf(control) === waveform.length - 1) ? 1 : getRight().x) - control.x) / 3
@@ -85,11 +116,7 @@ export const waveformEditor = h`
       const getLeftControlY = () => mapY(control.y - getLeftThird() * control.slope)
 
       const startDragControl = startDrag((x, y) => {
-        if (waveform.indexOf(control)) {
-          control.x = x
-        } else {
-          control.x = 0
-        }
+        control.x = waveform.indexOf(control) ? x : 0
         control.y = y
       })
       const startDragLeft = startDrag((x, y) => {
@@ -100,8 +127,8 @@ export const waveformEditor = h`
       })
       return h`
         <line 
-          x1="${() => mapX(control.x)}" 
-          y1="${() => mapY(control.y)}" 
+          x1="${getControlX}"
+          y1="${getControlY}" 
           x2="${getRightControlX}" 
           y2="${getRightControlY}"
           stroke="blue"
@@ -110,8 +137,8 @@ export const waveformEditor = h`
           <line 
             x1="${getLeftControlX}" 
             y1="${getLeftControlY}" 
-            x2="${() => mapX(control.x)}" 
-            y2="${() => mapY(control.y)}"
+            x2="${getControlX}"
+            y2="${getControlY}"
             stroke="red"
           />
           <circle r="5" onmousedown=${startDragLeft} cx="${getLeftControlX}" cy="${getLeftControlY}" fill="red"/>
@@ -120,14 +147,14 @@ export const waveformEditor = h`
             x1="${getLeftControlX}" 
             y1="${getLeftControlY}" 
             x2="${() => mapX(1)}" 
-            y2="${() => mapY(control.y)}"
+            y2="${getControlY}"
             stroke="red"
           />
           <circle r="5" onmousedown=${startDragLeft} cx="${getLeftControlX}" cy="${getLeftControlY}" fill="red"/>
-          <circle r="5" onmousedown=${startDragControl} cx="${() => mapX(1)}" cy="${() => mapY(control.y)}"/>
+          <circle r="5" onmousedown=${startDragControl} cx="${() => mapX(1)}" cy="${getControlY}"/>
         `)}
         <circle r="5" onmousedown=${startDragRight} cx="${getRightControlX}" cy="${getRightControlY}" fill="blue"/>
-        <circle r="5" onmousedown=${startDragControl} cx="${() => mapX(control.x)}" cy="${() => mapY(control.y)}"/>
+        <circle r="5" onmousedown=${startDragControl} cx="${getControlX}" cy="${getControlY}"/>
       `
     }))}
   </svg>
