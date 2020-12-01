@@ -20,6 +20,7 @@ export async function attachAudio () {
         bezierToneGenerator.port.postMessage({ name: 'notes', value: JSON.parse(JSON.stringify(model.notes)) })
       })
       watchFunction(() => {
+        console.log(JSON.stringify(model.waveforms, null, '  '))
         bezierToneGenerator.port.postMessage({ name: 'waveforms', value: JSON.parse(JSON.stringify(model.waveforms)) })
       })
     } catch (e) {

@@ -5,7 +5,6 @@ export const model = window.model = proxy({
   inputs: {},
   notes: {}
 })
-model.notes[0] = [{ index: 69 - 24, pressure: 40, controls: {} }]
 
 // channel voice messages
 const CHANNEL_VOICE_MESSAGE = 'Channel Voice Message'
@@ -125,12 +124,11 @@ navigator.requestMIDIAccess().then(midiAccess => {
   console.log(midiAccess)
   function updateIO (...args) {
     const existingKeys = new Set(Object.keys(model.inputs))
+    existingKeys.add('-1')
     Array.from(midiAccess.inputs.entries()).forEach(([id, MIDIInput]) => {
       const controls = {}
       const input = model.inputs[id] = model.inputs[id] || {}
-      // const notes = model.notes[id] = model.notes[id] || [{ controls }] // some proxy magic clones controls
-      const notes = []
-      model.notes[id] = [{ index: 69, pressure: 40, controls }]
+      const notes = model.notes[id] = model.notes[id] || [{ controls }] // some proxy magic clones controls
       function updateInput () {
         if (!MIDIInput) return
         input.name = MIDIInput.name
@@ -214,6 +212,7 @@ navigator.requestMIDIAccess().then(midiAccess => {
       existingKeys.delete(id)
     })
     existingKeys.forEach(id => delete model.inputs[id])
+    console.log(existingKeys)
   }
   midiAccess.onstatechange = updateIO
   updateIO()

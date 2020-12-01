@@ -3,10 +3,8 @@ import { model } from './MIDIModel.js'
 
 model.waveforms ??= [
   [
-    { x: 0 / 12, y: 1, slope: 10 },
-    { x: 3 / 12, y: -1, slope: -10 },
-    { x: 6 / 12, y: 1, slope: 10 },
-    { x: 9 / 12, y: -1, slope: -10 }
+    { x: 0, y: -1, slope: 0 },
+    { x: 0.5, y: 1, slope: 0 }
   ]
 ]
 
@@ -73,8 +71,18 @@ const addPoint = el => e => {
   console.log(x, y)
 }
 
+const toggleNote = el => e => {
+  if (model.notes['-1'] && model.notes['-1'].length) {
+    model.notes['-1'] = []
+  } else {
+    model.notes['-1'] = [{ index: 69, pressure: 127, controls: {} }]
+  }
+  console.log(model.notes)
+}
+
 export const waveformEditor = h`
   <h1>Waveform Editor</h1>
+  <button onclick=${toggleNote}>Toggle Note</button>
   <svg width="100%" height="400px" viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" style="border: 1px solid black; padding: 5px; box-sizing: border-box;">
     <g transform="scale(600 50) translate(0 3)">
       <rect id="coords" x="0" y="-1" width="1" height="2" fill="#eeeeee"/>
